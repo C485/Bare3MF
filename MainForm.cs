@@ -1,5 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using Bare3MF.Models;
+using Bare3MF.Services;
 
 namespace Bare3MF;
 
@@ -22,14 +24,16 @@ public class MainForm : Form
     private readonly Panel _dropPanel;
     private readonly Label _dropLabel;
     private readonly Label _hintLabel;
-    private readonly Label _creditLabel;
+    private readonly Label _versionLabel;
+    private readonly LinkLabel _updateLink;
     private readonly ListBox _logBox;
     private readonly LinkLabel _attributionLink;
     private readonly ProgressBar _progressBar;
+    private UpdateCheckResult? _updateCheck;
 
     public MainForm()
     {
-        var version = Application.ProductVersion.Split('+')[0];
+        var version = AppVersion.Display;
         var applicationIcon = System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath);
 
         if (applicationIcon is not null)
@@ -61,14 +65,19 @@ public class MainForm : Form
             Location = new(24, 56),
         };
 
-        _creditLabel = new Label
+        _updateLink = new LinkLabel
         {
-            Text = $"v{version}  ·  Created by Kamil Skoracki",
+            Text = "Check for updates",
             Font = new("Segoe UI", 9),
-            ForeColor = HintColor,
+            LinkColor = AccentColor,
+            ActiveLinkColor = AccentColor,
+            VisitedLinkColor = AccentColor,
+            LinkBehavior = LinkBehavior.HoverUnderline,
             AutoSize = true,
             Anchor = AnchorStyles.Top | AnchorStyles.Right,
         };
+        _updateLink.LinkArea = new(0, _updateLink.Text.Length);
+        _updateLink.LinkClicked += OnUpdateLinkClicked;
 
         _openFilesButton = CreateButton(
             "Open 3MF file(s)",
@@ -143,6 +152,15 @@ public class MainForm : Form
             Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
         };
 
+        _versionLabel = new Label
+        {
+            Text = $"v{version} · Created by Kamil Skoracki",
+            Font = new("Segoe UI", 8.25F),
+            ForeColor = HintColor,
+            AutoSize = true,
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
+        };
+
         _attributionLink = new LinkLabel
         {
             Text = "3mf icons created by designhub - Flaticon",
@@ -152,7 +170,7 @@ public class MainForm : Form
             VisitedLinkColor = HintColor,
             LinkBehavior = LinkBehavior.HoverUnderline,
             AutoSize = true,
-            Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
         };
         _attributionLink.LinkArea = new LinkArea(0, _attributionLink.Text.Length);
         _attributionLink.LinkClicked += OnAttributionLinkClicked;
@@ -161,15 +179,17 @@ public class MainForm : Form
         [
             titleLabel,
             subtitleLabel,
-            _creditLabel,
+            _updateLink,
             _openFilesButton,
             _openFolderButton,
             _dropPanel,
             _progressBar,
             _logBox,
+            _versionLabel,
             _attributionLink,
         ]);
 
+        Shown += OnFormShown;
         Resize += OnFormResize;
         OnFormResize(this, EventArgs.Empty);
     }
@@ -205,9 +225,10 @@ public class MainForm : Form
         _progressBar.Width = width;
         _logBox.Width = width;
         _logBox.Height = ClientSize.Height - _logBox.Top - 44;
-        _creditLabel.Location = new(ClientSize.Width - _creditLabel.Width - 24, 28);
+        _updateLink.Location = new(ClientSize.Width - _updateLink.Width - 24, 28);
+        _versionLabel.Location = new(24, ClientSize.Height - _versionLabel.Height - 6);
         _attributionLink.Location = new(
-            ClientSize.Width - _attributionLink.Width - 24,
+            _versionLabel.Right + 12,
             ClientSize.Height - _attributionLink.Height - 6);
         CenterDropLabels();
         _dropPanel.Invalidate();
@@ -394,6 +415,75 @@ public class MainForm : Form
                 MessageBoxButtons.OK,
                 errors > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
         }
+    }
+
+    private async void OnFormShown(object? sender, EventArgs e)
+    {
+        await CheckForUpdatesAsync(showUpToDateMessage: false);
+    }
+
+    private async void OnUpdateLinkClicked(object? sender, LinkLabelLinkClickedEventArgs e)
+    {
+        if (_updateCheck is { IsUpdateAvailable: true } update)
+        {
+            OpenUrl(update.ReleaseUrl);
+            return;
+        }
+
+        await CheckForUpdatesAsync(showUpToDateMessage: true);
+    }
+
+    private async Task CheckForUpdatesAsync(bool showUpToDateMessage)
+    {
+        SetUpdateLink("Checking for updates…", enabled: false);
+
+        var update = await UpdateService.CheckAsync(AppVersion.Current);
+
+        if (IsDisposed || Disposing)
+            return;
+
+        _updateCheck = update;
+
+        if (update is null)
+        {
+            SetUpdateLink("Check for updates");
+
+            if (showUpToDateMessage)
+            {
+                MessageBox.Show(
+                    "Could not retrieve the latest GitHub release. The repository may not have a published release yet, or the network is unavailable.",
+                    "Bare3MF",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+            }
+
+            return;
+        }
+
+        if (update.IsUpdateAvailable)
+        {
+            SetUpdateLink($"Update available: {update.LatestTag}");
+            return;
+        }
+
+        SetUpdateLink("Check for updates");
+
+        if (showUpToDateMessage)
+        {
+            MessageBox.Show(
+                $"You are running the latest version ({update.LatestTag}).",
+                "Bare3MF",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
+    }
+
+    private void SetUpdateLink(string text, bool enabled = true)
+    {
+        _updateLink.Enabled = enabled;
+        _updateLink.Text = text;
+        _updateLink.LinkArea = new(0, text.Length);
+        _updateLink.Location = new(ClientSize.Width - _updateLink.Width - 24, 28);
     }
 
     private void OnAttributionLinkClicked(object? sender, LinkLabelLinkClickedEventArgs e)
