@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Bare3MF</RootNamespace>
+    <AssemblyName>Bare3MF</AssemblyName>
+    <ApplicationIcon>Assets\ico.ico</ApplicationIcon>
+    <AssemblyTitle>Bare3MF</AssemblyTitle>
+    <Product>Bare3MF</Product>
+    <Description>Removes bundled slicer profiles from 3MF files while preserving model and multi-color data.</Description>
+    <Version>1.0.0</Version>
+    <Authors>Kamil Skoracki</Authors>
+    <Company>Kamil Skoracki</Company>
+    <Copyright>© 2026 Kamil Skoracki</Copyright>
+  </PropertyGroup>
+
+</Project>
